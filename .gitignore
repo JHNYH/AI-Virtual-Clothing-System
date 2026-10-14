@@ -1,0 +1,57 @@
+# ==================== 依赖与虚拟环境 ====================
+.venv/
+venv/
+env/
+ENV/
+node_modules/
+
+# ==================== Python ====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+AIWearPython/自动化测试/screenshots/
+
+# ==================== Java / Maven ====================
+target/
+*.class
+*.jar
+*.war
+!**/.mvn/wrapper/maven-wrapper.jar
+
+# ==================== 前端构建产物 ====================
+dist/
+dist-ssr/
+*.local
+
+# ==================== IDE ====================
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+
+# ==================== 日志 ====================
+*.log
+logs/
+
+# ==================== 运行时数据 ====================
+AIWear/uploads/
+AIWearPython/自动化测试/tmp/
+
+# ==================== 敏感配置（含真实凭据，禁止提交）====================
+AIWear/src/main/resources/application-local.yml
+**/application-local.yml
+AIWearPython/.env
+deploy/.env
+.env
+.env.local
+
+# 例外：配置模板允许提交
+!.env.example
+!**/.env.example

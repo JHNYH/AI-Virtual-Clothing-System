@@ -1,0 +1,112 @@
+server:
+  address: 0.0.0.0
+  port: 8081
+  tomcat:
+    # 请求体超过 max-file-size 被拒时，容器要先读完（吞掉）剩余未读的 body，才能把错误响应发回客户端。
+    # Tomcat 默认只吞 2MB（2097152），超限就直接复位连接 —— 前端表现为 Network Error 而非业务报错。
+    # 取值与 nginx client_max_body_size(100M) 对齐且 >= max-request-size(55MB)，
+    # 保证经网关放行的 oversized 请求都能正常拿到 GlobalExceptionHandler 的响应。
+    max-swallow-size: 100MB
+
+spring:
+  application:
+    name: aiwear-service
+
+  # 本地真实凭据（数据库密码、邮箱授权码、JWT 密钥）存放在 application-local.yml，
+  # 该文件已被 .gitignore 排除，不会进入版本库；文件缺失时回落到下面各处的 ${...} 占位符。
+  config:
+    import: optional:classpath:application-local.yml
+
+  servlet:
+    multipart:
+      # 与 aliyun.oss.max-size 保持一致（50MB = 52428800），request 留一点余量给 multipart 边界
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+  # MySQL数据源配置
+  datasource:
+    url: jdbc:mysql://118.190.217.49:3307/bite_wear?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=utf8
+    username: bite
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # Redis配置
+  data:
+    redis:
+      host: 118.190.217.49
+      port: 6379
+      database: 0
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+  # 邮件配置
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 3521364393@qq.com
+    password: ${MAIL_PASSWORD:} # 授权码，真实值见 application-local.yml
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+
+# MyBatis-Plus配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true # 开启驼峰命名转换
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto # 主键自增
+
+jwt:
+  # 真实密钥见 application-local.yml。下面这个占位串只为保证 clone 后能启动：
+  # HS256 要求密钥 ≥ 32 字节，否则 JwtUtil 初始化时抛 WeakKeyException。
+  secret: ${JWT_SECRET:change-this-secret-in-application-local-yml}
+  expiration: 2
+
+# 检索索引对账（设计前提：MySQL 是唯一事实来源，Redis 只是可随时重建的索引）
+aiwear:
+  vector:
+    # 启动时对全库用户做一次对账。
+    # 注意：本地开发与线上共用同一套 MySQL / Redis（见本文件 datasource、redis 配置），
+    # 启动对账会直接改动上面那台机器的数据（补写索引、清理孤儿、限额重算），
+    # 且本地通常没起 Python 服务，会对每个用户刷一条「Python 服务不可用」的 ERROR，
+    # 因此默认关闭；确需开启（例如线上 Redis 索引被清空后要自愈）时用启动参数覆盖：
+    #   java -jar AIWear-1.0-SNAPSHOT.jar --aiwear.vector.startup-reconcile=true
+    # 或设置环境变量 AIWEAR_STARTUP_RECONCILE=true
+    startup-reconcile: ${AIWEAR_STARTUP_RECONCILE:false}
+    # 对账时最多重算多少张「有图但没有向量」的图片，避免一次性打光大模型额度
+    startup-recompute-limit: 20
+
+python:
+  service:
+    base-url: http://127.0.0.1:5000
+    # Python 调用大多要连带等大模型，读超时给足；原先方法内 new RestTemplate() 没有任何超时
+    read-timeout-ms: 120000
+
+aliyun:
+  oss:
+    endpoint: oss-cn-qingdao.aliyuncs.com
+    region: cn-qingdao # V4 签名需要，取 endpoint 中 oss- 与 .aliyuncs.com 之间的部分
+    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
+    bucket-name: jhnyh-project-img
+    max-size: 52428800
+
+
+# 自定义日志配置
+logging:
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){cyan} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"
